@@ -140,6 +140,7 @@
 
   function updateAgencyState() {
     const isAgency = form.elements.isAgency.value === "是";
+    const isExistingAccount = form.elements.isExistingAccount.value === "是";
     noteRequiredMark.hidden = !isAgency;
     agencyNoteField.hidden = false;
     agencyNoteTopSlot.hidden = !isAgency;
@@ -159,6 +160,13 @@
 
     if (isAgency) {
       form.elements.genre.value = "Agency";
+    }
+    form.elements.adAccountName.required = isExistingAccount;
+    document.querySelector("#adAccountNameField").hidden = !isExistingAccount;
+    if (isExistingAccount) {
+      form.elements.newCustomerStatus.value = "Existing";
+    } else if (form.elements.newCustomerStatus.value === "Existing") {
+      form.elements.newCustomerStatus.value = "New";
     }
   }
 
@@ -190,6 +198,13 @@
     if (links.length) {
       form.elements.productLinks.value = links.join("\n");
       resizeTextarea(form.elements.productLinks);
+    }
+  }
+
+  function enforceDailySpendMinimum() {
+    const normalized = core.normalizeDailySpend(form.elements.dailySpend.value);
+    if (normalized !== "" && String(normalized) !== form.elements.dailySpend.value) {
+      form.elements.dailySpend.value = normalized;
     }
   }
 
@@ -233,6 +248,8 @@
       "contactRole",
       "email",
       "molocoSales",
+      "isExistingAccount",
+      "adAccountName",
       "productLinks",
       "genre",
       "subGenre",
@@ -272,6 +289,7 @@
 
     autoFormatEmailField();
     autoFormatProductLinks();
+    enforceDailySpendMinimum();
     updateRecognition();
     resizeTextareas();
     scheduleProductPageRecognition();
@@ -402,7 +420,11 @@
   }
 
   function canReplaceAutoValue(element) {
-    return !element.dataset.edited || element.value === element.dataset.autoValue;
+    return (
+      !element.dataset.edited ||
+      element.value === element.dataset.autoValue ||
+      !String(element.value || "").trim()
+    );
   }
 
   function updateRecognition() {
@@ -529,17 +551,60 @@
   }
 
   async function classifyProductViaScript(scriptUrl, productLinks) {
-    const response = await fetch(scriptUrl, {
-      method: "POST",
-      mode: "cors",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ action: "classifyProduct", productLinks }),
-    });
-    const payload = await response.json();
-    if (!payload.ok) {
-      throw new Error(payload.message || "产品页面识别失败");
+    try {
+      const response = await fetch(scriptUrl, {
+        method: "POST",
+        mode: "cors",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ action: "classifyProduct", productLinks }),
+      });
+      const payload = await response.json();
+      if (!payload.ok) {
+        throw new Error(payload.message || "产品页面识别失败");
+      }
+      return payload;
+    } catch (error) {
+      return classifyProductViaJsonp(scriptUrl, productLinks, error);
     }
-    return payload;
+  }
+
+  function classifyProductViaJsonp(scriptUrl, productLinks, originalError) {
+    return new Promise((resolve, reject) => {
+      const callbackName = `molocoClassify_${Date.now()}_${Math.random()
+        .toString(36)
+        .slice(2)}`;
+      const url = new URL(scriptUrl);
+      const script = document.createElement("script");
+      const cleanup = () => {
+        delete window[callbackName];
+        script.remove();
+      };
+      const timer = window.setTimeout(() => {
+        cleanup();
+        reject(originalError || new Error("产品页面识别超时"));
+      }, 20000);
+
+      window[callbackName] = (payload) => {
+        window.clearTimeout(timer);
+        cleanup();
+        if (!payload?.ok) {
+          reject(new Error(payload?.message || "产品页面识别失败"));
+          return;
+        }
+        resolve(payload);
+      };
+
+      url.searchParams.set("action", "classifyProduct");
+      url.searchParams.set("productLinks", productLinks);
+      url.searchParams.set("callback", callbackName);
+      script.onerror = () => {
+        window.clearTimeout(timer);
+        cleanup();
+        reject(originalError || new Error("产品页面识别失败"));
+      };
+      script.src = url.toString();
+      document.head.appendChild(script);
+    });
   }
 
   function applyProductPageRecognition(category) {
@@ -589,12 +654,14 @@
 
       try {
         setRecognitionHint("正在通过产品页面识别品类和主体名称...");
+        modePill.textContent = "正在联网识别";
         const category = await classifyProductViaScript(scriptUrl, links.join("\n"));
         lastProductPageRecognitionKey = key;
         applyProductPageRecognition(category);
         updateRecognition();
       } catch (error) {
         lastProductPageRecognitionKey = "";
+        modePill.textContent = "联网识别失败";
         setRecognitionHint([
           "产品页面联网识别失败，已保留本地规则识别结果。",
           error.message || "请确认 Apps Script Web App URL 已重新部署新版本。",
@@ -610,6 +677,8 @@
     form.elements.stage.value = "开户中";
     form.elements.agency.value = "MADHOUSE";
     form.elements.newCustomerStatus.value = "New";
+    form.elements.isExistingAccount.value = "否";
+    form.elements.adAccountName.value = "";
     delete form.elements.clientLastName.dataset.edited;
     delete form.elements.clientFirstName.dataset.edited;
     delete form.elements.entityName.dataset.edited;
@@ -667,6 +736,10 @@
     }, 0);
   });
   form.elements.productLinks.addEventListener("input", scheduleProductLinkFormatting);
+  form.elements.dailySpend.addEventListener("blur", () => {
+    enforceDailySpendMinimum();
+    updateRecognition();
+  });
 
   modeCards.forEach((card) => {
     card.addEventListener("click", () => {
@@ -739,6 +812,7 @@
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
+    enforceDailySpendMinimum();
     updateRecognition();
 
     const input = getFormInput();
