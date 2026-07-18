@@ -664,7 +664,7 @@
         modePill.textContent = "联网识别失败";
         setRecognitionHint([
           "产品页面联网识别失败，已保留本地规则识别结果。",
-          error.message || "请确认 Apps Script Web App URL 已重新部署新版本。",
+          `失败原因：${error.message || "请确认 Apps Script Web App URL 已重新部署新版本。"}`,
         ].join("\n"));
       }
     }, 900);
