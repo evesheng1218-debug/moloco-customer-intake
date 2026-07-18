@@ -14,6 +14,7 @@
   const adminPanel = document.querySelector(".admin-panel");
   const modeCards = Array.from(document.querySelectorAll("[data-entry-mode]"));
   const recognitionHint = document.querySelector("#recognitionHint");
+  const recognitionStatus = document.querySelector("#recognitionStatus");
   const core = window.MolocoIntakeCore;
   const DEFAULT_SCRIPT_URL =
     "https://script.google.com/macros/s/AKfycbxkk2de7YLmx9tl9S_GDAYFVoBl4RsIyHGIFhXd9TcUrDtKkWX__f57xcZVaitCLbHd/exec";
@@ -23,9 +24,14 @@
   let lastProductPageRecognitionKey = "";
   let lastProductPageRecognition;
 
-  function setRecognitionHint(message) {
+  function setRecognitionHint(message, type = "info") {
     if (recognitionHint) {
       recognitionHint.value = message;
+    }
+    if (recognitionStatus) {
+      recognitionStatus.hidden = !message;
+      recognitionStatus.textContent = message;
+      recognitionStatus.dataset.type = type;
     }
   }
 
@@ -636,7 +642,7 @@
         ? `主体名称：从产品页面识别到 ${entityName}`
         : "主体名称：产品页面未识别到英文开发者/主体名称，已优先使用英文客户名兜底",
       `识别链接：${category.sourceUrl || "产品链接"}`,
-    ].join("\n"));
+    ].join("\n"), "success");
     lastProductPageRecognition = { ...category, entityName };
   }
 
@@ -653,7 +659,7 @@
       lastProductPageRecognition = null;
 
       try {
-        setRecognitionHint("正在通过产品页面识别品类和主体名称...");
+        setRecognitionHint("正在通过产品页面识别品类和主体名称...", "info");
         modePill.textContent = "正在联网识别";
         const category = await classifyProductViaScript(scriptUrl, links.join("\n"));
         lastProductPageRecognitionKey = key;
@@ -665,7 +671,7 @@
         setRecognitionHint([
           "产品页面联网识别失败，已保留本地规则识别结果。",
           `失败原因：${error.message || "请确认 Apps Script Web App URL 已重新部署新版本。"}`,
-        ].join("\n"));
+        ].join("\n"), "error");
       }
     }, 900);
   }
