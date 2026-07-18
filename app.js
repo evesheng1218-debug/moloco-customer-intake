@@ -543,15 +543,16 @@
 
       const key = `${scriptUrl}::${links[0]}`;
       if (key === lastProductPageRecognitionKey) return;
-      lastProductPageRecognitionKey = key;
       lastProductPageRecognition = null;
 
       try {
         setRecognitionHint("正在通过产品页面识别品类和主体名称...");
         const category = await classifyProductViaScript(scriptUrl, links.join("\n"));
+        lastProductPageRecognitionKey = key;
         applyProductPageRecognition(category);
         updateRecognition();
       } catch (error) {
+        lastProductPageRecognitionKey = "";
         setRecognitionHint([
           "产品页面联网识别失败，已保留本地规则识别结果。",
           error.message || "请确认 Apps Script Web App URL 已重新部署新版本。",
@@ -565,7 +566,7 @@
     form.elements.dailySpend.value = "300";
     form.elements.budgetBucket.value = "尾部(<1k)";
     form.elements.stage.value = "开户中";
-    form.elements.agency.value = "Madhouse";
+    form.elements.agency.value = "MADHOUSE";
     form.elements.newCustomerStatus.value = "New";
     delete form.elements.clientLastName.dataset.edited;
     delete form.elements.clientFirstName.dataset.edited;

@@ -662,8 +662,12 @@
       const note = normalizeText(input.note);
       if (!note) {
         errors.push("Agency 客户必须填写 Note，粘贴营业执照链接或文件名说明");
-      } else if (!/https:\/\/bluefocus\.feishu\.cn\/(?:drive|file|docs|wiki)\//.test(note)) {
-        errors.push("Agency 客户必须在 Note 粘贴飞书网盘营业执照链接");
+      } else if (
+        !/https:\/\/(?:bluefocus\.feishu\.cn\/(?:drive|file|docs|wiki)|drive\.google\.com\/(?:file\/d|open\b|drive\/folders))\//.test(
+          note
+        )
+      ) {
+        errors.push("Agency 客户必须在 Note 粘贴飞书或 Google Drive 营业执照链接");
       }
     }
 
@@ -793,7 +797,7 @@
       agreeToPublishOnGetApps: "",
       week: "",
       pipelineSource: "",
-      agency: normalizeText(input.agency) || "Madhouse",
+      agency: normalizeText(input.agency) || "MADHOUSE",
       workplace: "",
       newCustomerStatus: normalizeText(input.newCustomerStatus) || "New",
       pipelineCreationDays: "",
