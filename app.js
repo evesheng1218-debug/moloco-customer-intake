@@ -42,11 +42,7 @@
   function setupDatalistFullPicker() {
     form.querySelectorAll("input[list]").forEach((input) => {
       input.addEventListener("pointerdown", (event) => {
-        if (event.button !== 0 || !input.value || typeof input.showPicker !== "function") return;
-
-        const rect = input.getBoundingClientRect();
-        const isPickerArea = event.clientX >= rect.right - 44;
-        if (!isPickerArea) return;
+        if (event.button !== 0 || typeof input.showPicker !== "function") return;
 
         const originalValue = input.value;
         let hasSelection = false;
@@ -163,7 +159,6 @@
 
     if (isAgency) {
       form.elements.genre.value = "Agency";
-      form.elements.subGenre.value = "";
     }
   }
 
@@ -195,6 +190,14 @@
     if (links.length) {
       form.elements.productLinks.value = links.join("\n");
       resizeTextarea(form.elements.productLinks);
+    }
+  }
+
+  function clearProductPageRecognitionIfProductChanged() {
+    const firstLink = core.normalizeProductLinks(form.elements.productLinks.value)[0] || "";
+    const currentKey = firstLink ? `${getScriptUrl()}::${firstLink}` : "";
+    if (currentKey !== lastProductPageRecognitionKey) {
+      lastProductPageRecognition = null;
     }
   }
 
@@ -375,11 +378,9 @@
   function scheduleProductLinkFormatting() {
     window.clearTimeout(productFormatTimer);
     productFormatTimer = window.setTimeout(() => {
-      const before = form.elements.productLinks.value;
       autoFormatProductLinks();
-      if (form.elements.productLinks.value !== before) {
-        updateRecognition();
-      }
+      clearProductPageRecognitionIfProductChanged();
+      updateRecognition();
       scheduleProductPageRecognition();
     }, 250);
   }
@@ -414,8 +415,23 @@
     const names = core.inferNamesFromEmails(primaryEmail);
     const bundleIds = core.extractBundleIds(input.productLinks);
     const isAgency = input.isAgency === "是";
-    const category = core.guessCategoryFromProductLinks(input.productLinks, isAgency);
-    const effectiveCategory = lastProductPageRecognition || category;
+    const linkCategory = core.guessCategoryFromProductLinks(input.productLinks, false);
+    const category = isAgency
+      ? {
+          genre: "Agency",
+          subGenre: linkCategory.subGenre,
+          confidence: linkCategory.subGenre
+            ? "Agency 优先品类，子品类根据第一条产品链接识别"
+            : "Agency 优先品类，子品类待确认",
+          commercializationNote: linkCategory.commercializationNote || "",
+        }
+      : linkCategory;
+    const effectiveCategory = lastProductPageRecognition
+      ? {
+          ...lastProductPageRecognition,
+          genre: isAgency ? "Agency" : lastProductPageRecognition.genre,
+        }
+      : category;
     const missingCommentParts = [];
 
     if (canReplaceAutoValue(form.elements.clientLastName)) {
@@ -427,19 +443,34 @@
     if (canReplaceAutoValue(form.elements.entityName)) {
       setAutoValue(
         form.elements.entityName,
-        core.keepEnglishEntityName(lastProductPageRecognition?.entityName || "")
+        core.keepEnglishEntityName(lastProductPageRecognition?.entityName || input.companyName)
       );
     }
-    if (effectiveCategory.genre && canReplaceAutoValue(form.elements.genre)) {
+    if (
+      effectiveCategory.genre &&
+      core.isAllowedGenre(effectiveCategory.genre) &&
+      canReplaceAutoValue(form.elements.genre)
+    ) {
       setAutoValue(form.elements.genre, effectiveCategory.genre);
     }
-    if (effectiveCategory.subGenre && canReplaceAutoValue(form.elements.subGenre)) {
+    if (
+      effectiveCategory.subGenre &&
+      core.isAllowedSubGenre(effectiveCategory.subGenre) &&
+      canReplaceAutoValue(form.elements.subGenre)
+    ) {
       setAutoValue(form.elements.subGenre, effectiveCategory.subGenre);
+    }
+    if (
+      !isAgency &&
+      effectiveCategory.commercializationNote &&
+      canReplaceAutoValue(form.elements.note)
+    ) {
+      setAutoValue(form.elements.note, effectiveCategory.commercializationNote);
     }
     if (canReplaceAutoValue(form.elements.comments)) {
       const genre = form.elements.genre.value;
       const subGenre = form.elements.subGenre.value;
-      const categoryText = [genre, subGenre].filter(Boolean).join(" / ") || "待人工确认";
+      const categoryText = [genre, subGenre].filter(Boolean).join(" / ") || "待确认";
       setAutoValue(
         form.elements.comments,
         input.geo ? `客户品类为 ${categoryText}，投放地区为 ${input.geo}。` : ""
@@ -513,13 +544,22 @@
 
   function applyProductPageRecognition(category) {
     const entityName = core.keepEnglishEntityName(category.entityName || "");
-    if (category.genre && canReplaceAutoValue(form.elements.genre)) {
-      setAutoValue(form.elements.genre, category.genre);
+    const isAgency = form.elements.isAgency.value === "是";
+    if (category.genre && core.isAllowedGenre(category.genre) && canReplaceAutoValue(form.elements.genre)) {
+      setAutoValue(form.elements.genre, isAgency ? "Agency" : category.genre);
       delete form.elements.genre.dataset.edited;
     }
-    if (category.subGenre && canReplaceAutoValue(form.elements.subGenre)) {
+    if (category.subGenre && core.isAllowedSubGenre(category.subGenre) && canReplaceAutoValue(form.elements.subGenre)) {
       setAutoValue(form.elements.subGenre, category.subGenre);
       delete form.elements.subGenre.dataset.edited;
+    }
+    if (
+      !isAgency &&
+      category.commercializationNote &&
+      canReplaceAutoValue(form.elements.note)
+    ) {
+      setAutoValue(form.elements.note, category.commercializationNote);
+      delete form.elements.note.dataset.edited;
     }
     if (entityName && canReplaceAutoValue(form.elements.entityName)) {
       setAutoValue(form.elements.entityName, entityName);
@@ -527,7 +567,9 @@
     }
     setRecognitionHint([
       `品类：${category.confidence}`,
-      entityName ? `主体名称：从产品页面识别到 ${entityName}` : "主体名称：产品页面未识别到英文开发者/主体名称",
+      entityName
+        ? `主体名称：从产品页面识别到 ${entityName}`
+        : "主体名称：产品页面未识别到英文开发者/主体名称，已优先使用英文客户名兜底",
       `识别链接：${category.sourceUrl || "产品链接"}`,
     ].join("\n"));
     lastProductPageRecognition = { ...category, entityName };
@@ -612,12 +654,14 @@
   });
   form.elements.productLinks.addEventListener("blur", () => {
     autoFormatProductLinks();
+    clearProductPageRecognitionIfProductChanged();
     updateRecognition();
     scheduleProductPageRecognition();
   });
   form.elements.productLinks.addEventListener("paste", () => {
     window.setTimeout(() => {
       autoFormatProductLinks();
+      clearProductPageRecognitionIfProductChanged();
       updateRecognition();
       scheduleProductPageRecognition();
     }, 0);

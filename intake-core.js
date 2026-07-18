@@ -38,17 +38,80 @@
     newCustomerStatus: ["是否新户", "newCustomerStatus", "new customer"],
     note: ["Note", "备注", "说明"],
   };
-  const MOLOCO_SALES_BY_EMAIL = {
-    "nina.cui@moloco.com": "Nina Cui",
-    "ron.chen@moloco.com": "Ron Chen",
-    "jolie.zhang@moloco.com": "Jolie Zhang",
-    "kimmy.lin@moloco.com": "Kimmy Lin",
-    "sharon.kong@moloco.com": "Sharon Kong",
-  };
+	  const MOLOCO_SALES_BY_EMAIL = {
+	    "nina.cui@moloco.com": "Nina Cui",
+	    "ron.chen@moloco.com": "Ron Chen",
+	    "jolie.zhang@moloco.com": "Jolie Zhang",
+	    "kimmy.lin@moloco.com": "Kimmy Lin",
+	    "sharon.kong@moloco.com": "Sharon Kong",
+	  };
+	  const ALLOWED_GENRES = new Set([
+	    "Casual",
+	    "Core",
+	    "Slots/Social Casino",
+	    "RealMoney",
+	    "Scratcher",
+	    "Non-gaming",
+	    "Agency",
+	  ]);
+	  const ALLOWED_SUB_GENRES = new Set([
+	    "Casual-IAA",
+	    "Casual-IAP",
+	    "RPG",
+	    "SLG",
+	    "Action",
+	    "Simulation",
+	    "Slots/Social Casino",
+	    "RealMoney",
+	    "Scratcher",
+	    "Social",
+	    "e-Commerce",
+	    "Fintech",
+	    "Reading",
+	    "AI tools",
+	    "Utility",
+	    "Entertainment",
+	    "ShortTV",
+	    "Sports",
+	  ]);
+	  const SUB_GENRES_BY_GENRE = {
+	    Casual: new Set(["Casual-IAA", "Casual-IAP"]),
+	    Core: new Set(["RPG", "SLG", "Action", "Simulation"]),
+	    "Slots/Social Casino": new Set(["Slots/Social Casino"]),
+	    RealMoney: new Set(["RealMoney"]),
+	    Scratcher: new Set(["Scratcher"]),
+	    "Non-gaming": new Set([
+	      "Social",
+	      "e-Commerce",
+	      "Fintech",
+	      "Reading",
+	      "AI tools",
+	      "Utility",
+	      "Entertainment",
+	      "ShortTV",
+	      "Sports",
+	    ]),
+	  };
 
-  function normalizeText(value) {
-    return String(value ?? "").trim();
-  }
+	  function normalizeText(value) {
+	    return String(value ?? "").trim();
+	  }
+
+	  function isAllowedGenre(value) {
+	    return ALLOWED_GENRES.has(normalizeText(value));
+	  }
+
+	  function isAllowedSubGenre(value) {
+	    return ALLOWED_SUB_GENRES.has(normalizeText(value));
+	  }
+
+	  function isLogicalSubGenre(genre, subGenre) {
+	    const normalizedGenre = normalizeText(genre);
+	    const normalizedSubGenre = normalizeText(subGenre);
+	    if (!normalizedGenre || !normalizedSubGenre) return true;
+	    if (normalizedGenre === "Agency") return isAllowedSubGenre(normalizedSubGenre);
+	    return Boolean(SUB_GENRES_BY_GENRE[normalizedGenre]?.has(normalizedSubGenre));
+	  }
 
   function splitProductLinks(productLinks) {
     return normalizeText(productLinks)
@@ -467,21 +530,21 @@
     const hasIap = /in-app purchases|in app purchases|内购|应用内购买/.test(text);
 
     const rules = [
-      [/real money|realmoney|betting|cash reward|withdraw|真钱|提现|博彩/, "RealMoney", "RealMoney"],
-      [/slot|casino|bingo|poker|老虎机|赌场|宾果/, "Slots/Social Casino", "Slots/Social Casino"],
-      [/scratch|scratchcard|刮刮乐|刮奖/, "Scratcher", "Scratcher"],
-      [/role playing|rpg|hero|heroes|guild|equipment|角色|装备|公会|队伍养成/, "Core", "RPG"],
-      [/strategy|slg|empire|kingdom|alliance|resource management|策略|联盟|资源管理/, "Core", "SLG"],
-      [/action|shooting|shooter|fighting|battle royale|射击|格斗|动作/, "Core", "Action"],
-      [/simulation|simulator|farming|city building|tycoon|模拟|经营|农场|城市建设/, "Core", "Simulation"],
-      [/shopping|e-commerce|ecommerce|marketplace|mall|购物|电商/, "Non-gaming", "e-Commerce"],
-      [/fintech|bank|loan|wallet|payment|finance|银行|贷款|钱包|支付/, "Non-gaming", "Fintech"],
-      [/novel|comic|ebook|reading|news|小说|漫画|阅读|新闻/, "Non-gaming", "Reading"],
-      [/\bai\b|chatbot|gpt|generator|ai assistant|ai生成|ai聊天/, "Non-gaming", "AI tools"],
-      [/vpn|cleaner|scanner|file manager|utility|工具|清理|扫描/, "Non-gaming", "Utility"],
-      [/video|music|live streaming|entertainment|视频|音乐|直播|娱乐/, "Non-gaming", "Entertainment"],
-      [/short drama|shorttv|vertical drama|短剧|微短剧/, "Non-gaming", "ShortTV"],
+      [/real money|realmoney|betting|cash reward|withdraw|真钱|提现|博彩|投注|现金奖励|现实价值/, "RealMoney", "RealMoney"],
+      [/slot|casino|bingo|poker|老虎机|赌场|宾果|扑克/, "Slots/Social Casino", "Slots/Social Casino"],
+      [/scratch|scratchcard|刮刮乐|刮奖|即时揭晓/, "Scratcher", "Scratcher"],
+      [/role playing|rpg|hero|heroes|guild|equipment|skill|story|角色|装备|技能|剧情|公会|队伍养成|角色养成/, "Core", "RPG"],
+      [/strategy|slg|empire|kingdom|alliance|march|resource management|base building|策略|联盟|行军|资源管理|基地建设|长期策略/, "Core", "SLG"],
+      [/action|shooting|shooter|fighting|battle royale|real-time combat|射击|格斗|动作|即时战斗|实时操作/, "Core", "Action"],
+      [/simulation|simulator|farming|city building|tycoon|life simulation|career simulation|模拟|经营|农场|城市建设|人生|职业模拟/, "Core", "Simulation"],
+      [/shopping|e-commerce|ecommerce|marketplace|mall|交易平台|购物|电商/, "Non-gaming", "e-Commerce"],
+      [/fintech|bank|loan|wallet|payment|finance|invest|insurance|银行|贷款|钱包|支付|投资|保险/, "Non-gaming", "Fintech"],
+      [/novel|comic|ebook|reading|news|小说|漫画|阅读|新闻|电子书/, "Non-gaming", "Reading"],
+      [/\bai\b|chatbot|gpt|generator|ai assistant|ai生成|ai聊天|ai辅助/, "Non-gaming", "AI tools"],
+      [/vpn|cleaner|scanner|file manager|utility|工具|清理|扫描|文件管理/, "Non-gaming", "Utility"],
+      [/short drama|shorttv|vertical drama|短剧|微短剧|竖屏短剧/, "Non-gaming", "ShortTV"],
       [/sports|score|match live|赛事|比分|体育/, "Non-gaming", "Sports"],
+      [/video|music|live streaming|entertainment|视频|音乐|直播|娱乐/, "Non-gaming", "Entertainment"],
       [/social|chat|dating|community|社交|聊天|交友|社区/, "Non-gaming", "Social"],
     ];
 
@@ -491,10 +554,12 @@
     }
 
     if (/casual|puzzle|match 3|match-3|runner|merge|休闲|解谜|跑酷|三消/.test(text)) {
+      const subGenre = hasAds ? "Casual-IAA" : "Casual-IAP";
       return {
         genre: "Casual",
-        subGenre: hasAds ? "Casual-IAA" : hasIap ? "Casual-IAP" : "Casual-IAP",
+        subGenre,
         confidence: "根据产品页面内容识别",
+        ...(!hasAds && !hasIap ? { commercializationNote: "商业化模式待确认" } : {}),
       };
     }
 
@@ -503,6 +568,7 @@
         genre: "Casual",
         subGenre: hasAds ? "Casual-IAA" : "Casual-IAP",
         confidence: "根据产品页面内容识别",
+        ...(!hasAds && !hasIap ? { commercializationNote: "商业化模式待确认" } : {}),
       };
     }
 
@@ -535,15 +601,14 @@
     if (!normalized) return "";
     if (/[^\x00-\x7F]/.test(normalized)) return "";
     return normalized
-      .replace(/\s+-\s+英文主体待人工确认$/i, "")
+      .replace(/\s+-\s+英文主体待确认$/i, "")
       .replace(/\s+/g, " ")
       .trim();
   }
 
   function guessCategoryFromProductLinks(productLinks, isAgency = false) {
-    if (isAgency) return { genre: "Agency", subGenre: "Agency", confidence: "Agency 优先规则" };
-
-    const rawText = normalizeProductLinks(productLinks).join(" ").toLowerCase();
+    const firstLink = normalizeProductLinks(productLinks)[0] || "";
+    const rawText = firstLink.toLowerCase();
     const isOneStoreCategoryLink = /onestore\.co\.kr/.test(rawText);
     const text = isOneStoreCategoryLink
       ? rawText.replace(/onestore|one-store|store/g, " ")
@@ -570,6 +635,11 @@
     ];
 
     const matched = rules.find(([pattern]) => pattern.test(text));
+    if (isAgency) {
+      return matched
+        ? { genre: "Agency", subGenre: matched[2], confidence: "Agency 优先品类，子品类根据第一条产品链接识别" }
+        : { genre: "Agency", subGenre: "", confidence: "Agency 优先品类，子品类待确认" };
+    }
     if (!matched && isOneStoreCategoryLink) {
       return {
         genre: "",
@@ -602,7 +672,7 @@
         if (/^[a-zA-Z][\w]*(\.[\w]+)+$/.test(packageName || "")) {
           return packageName;
         }
-        return "待人工确认（One Store 需开发者平台/配置确认 Package Name）";
+        return "待确认（One Store 需开发者平台/配置确认 Package Name）";
       }
 
       const playId = url.searchParams.get("id");
@@ -616,7 +686,7 @@
         );
         return packageMatch
           ? packageMatch[1]
-          : "待人工确认（One Store 需开发者平台/配置确认 Package Name）";
+          : "待确认（One Store 需开发者平台/配置确认 Package Name）";
       }
       const idMatch = link.match(/[?&]id=([a-zA-Z][\w]*(?:\.[\w]+)+)/);
       if (idMatch) {
@@ -625,11 +695,11 @@
     }
 
     if (isOneStoreLink) {
-      return "待人工确认（One Store 需开发者平台/配置确认 Package Name）";
+      return "待确认（One Store 需开发者平台/配置确认 Package Name）";
     }
 
     const fallbackPlayId = link.match(/[?&]id=([a-zA-Z][\w]*(?:\.[\w]+)+)/);
-    return fallbackPlayId ? fallbackPlayId[1] : "待人工确认";
+    return fallbackPlayId ? fallbackPlayId[1] : "待确认";
   }
 
   function extractBundleIds(productLinks) {
@@ -658,21 +728,33 @@
       errors.push("预估日预算必须是数字");
     }
 
-    if (normalizeText(input.isAgency) === "是") {
-      const note = normalizeText(input.note);
-      if (!note) {
-        errors.push("Agency 客户必须填写 Note，粘贴营业执照链接或文件名说明");
+	    if (normalizeText(input.isAgency) === "是") {
+	      const note = normalizeText(input.note);
+	      if (!note) {
+	        errors.push("Agency 客户必须填写 Note，粘贴营业执照链接或文件名说明");
       } else if (
         !/https:\/\/(?:bluefocus\.feishu\.cn\/(?:drive|file|docs|wiki)|drive\.google\.com\/(?:file\/d|open\b|drive\/folders))\//.test(
           note
         )
       ) {
-        errors.push("Agency 客户必须在 Note 粘贴飞书或 Google Drive 营业执照链接");
-      }
-    }
+	        errors.push("Agency 客户必须在 Note 粘贴飞书或 Google Drive 营业执照链接");
+	      }
+	    }
 
-    return errors;
-  }
+	    const outputGenre = normalizeText(input.isAgency) === "是" ? "Agency" : normalizeText(input.genre);
+	    const outputSubGenre = normalizeText(input.subGenre);
+	    if (outputGenre && !isAllowedGenre(outputGenre)) {
+	      errors.push("品类必须是下拉菜单中的选项");
+	    }
+	    if (outputSubGenre && !isAllowedSubGenre(outputSubGenre)) {
+	      errors.push("子品类必须是下拉菜单中的选项");
+	    }
+	    if (outputGenre && outputSubGenre && !isLogicalSubGenre(outputGenre, outputSubGenre)) {
+	      errors.push("品类与子品类不匹配，请从下拉菜单重新选择");
+	    }
+
+	    return errors;
+	  }
 
   function titleCasePart(value) {
     if (!value) return "";
@@ -753,8 +835,8 @@
     const provided = normalizeText(input.comments);
     if (provided) return provided;
 
-    const categoryText = [genre, subGenre].filter(Boolean).join(" / ") || "待人工确认";
-    const geo = normalizeText(input.geo) || "待人工确认";
+    const categoryText = [genre, subGenre].filter(Boolean).join(" / ") || "待确认";
+    const geo = normalizeText(input.geo) || "待确认";
     return `客户品类为 ${categoryText}，投放地区为 ${geo}。`;
   }
 
@@ -765,7 +847,7 @@
     const primaryEmail = normalizedEmails[0] || normalizeText(input.email);
     const inferredName = inferNameFromEmail(primaryEmail);
     const genre = isAgency ? "Agency" : normalizeText(input.genre);
-    const subGenre = isAgency ? "" : normalizeText(input.subGenre);
+    const subGenre = normalizeText(input.subGenre);
     const today =
       options.today ||
       new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Shanghai" });
@@ -843,11 +925,13 @@
   return {
       buildSubmission,
       classifyCategoryFromPageText,
-      extractBundleIds,
-      extractEntityNameFromPageText,
-      guessCategoryFromProductLinks,
-      inferNamesFromEmails,
-      keepEnglishEntityName,
+	      extractBundleIds,
+	      extractEntityNameFromPageText,
+	      guessCategoryFromProductLinks,
+	      inferNamesFromEmails,
+	      isAllowedGenre,
+	      isAllowedSubGenre,
+	      keepEnglishEntityName,
       mapOpeningSheetCellsToInput,
       mapSpreadsheetRowToInput,
       normalizeMolocoSales,
