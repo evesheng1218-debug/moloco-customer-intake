@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Moloco 客户信息录入</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="page-header">
+        <div>
+          <p class="eyebrow">Madhouse x Moloco</p>
+          <h1><span>Moloco</span> 客户信息录入</h1>
+        </div>
+        <div class="status-pill" id="modePill">待配置同步</div>
+      </header>
+
+      <form id="intakeForm" class="manual-mode" novalidate>
+        <section class="mode-panel">
+          <button class="mode-card active" type="button" data-entry-mode="manual" aria-pressed="true">
+            <span>手动输入</span>
+            <small>销售逐项填写，适合单个客户</small>
+          </button>
+          <button class="mode-card" type="button" data-entry-mode="excel" aria-pressed="false">
+            <span>上传 Excel</span>
+            <small>先上传开户表，系统自动填入可识别字段</small>
+          </button>
+        </section>
+
+        <section class="panel excel-panel" id="excelPanel" hidden>
+          <div class="section-title">
+            <h2>Excel 开户表上传</h2>
+            <p>上传后会自动匹配字段，填入下面可提交到 Google Sheet 的表单。</p>
+          </div>
+          <label class="field wide upload-field">
+            <span>上传 Excel 开户表</span>
+            <input name="excelFile" type="file" accept=".csv,.tsv,.xlsx,.xls" />
+          </label>
+          <p class="helper-text" id="excelStatus">尚未上传文件</p>
+        </section>
+
+        <section class="panel required-panel">
+          <div class="section-title">
+            <h2>销售必填信息</h2>
+            <p>优先填写这些字段，提交时会自动映射到 Google Sheet。</p>
+          </div>
+          <div class="grid">
+            <label class="field">
+              <span>代理商销售 <strong>*</strong></span>
+              <input name="agencySales" list="agencySalesOptions" required placeholder="输入销售姓名" />
+            </label>
+            <fieldset class="field radio-field">
+              <legend>是否为 Agency <strong>*</strong></legend>
+              <div class="radio-row">
+                <label><input type="radio" name="isAgency" value="否" checked /> <span>否</span></label>
+                <label><input type="radio" name="isAgency" value="是" /> <span>是</span></label>
+              </div>
+            </fieldset>
+            <label class="field">
+              <span>客户名 <strong>*</strong></span>
+              <input name="companyName" required />
+            </label>
+            <label class="field">
+              <span>Moloco Sales <strong>*</strong></span>
+              <input name="molocoSales" list="molocoSalesOptions" required placeholder="选择直客，Growth为增长团队" />
+            </label>
+            <div id="agencyNoteTopSlot" class="agency-note-slot wide" hidden></div>
+            <div id="agencyLicenseNotice" class="agency-license-notice wide">
+              <span>
+                Agency 客户营业执照上传地址：
+                <a href="https://bluefocus.feishu.cn/drive/folder/Aw4hftbKBlN97Cd7BuBcGFiqnsf" target="_blank" rel="noreferrer">飞书网盘文件夹</a>
+              </span>
+              <span>
+                Moloco二代营业执照上传步骤：
+                <a href="https://bluefocus.feishu.cn/wiki/HrIuwWwE6iHunKkEusacSgLGnQd?sheet=Hm6t1a" target="_blank" rel="noreferrer">查看操作说明</a>
+              </span>
+            </div>
+            <label class="field wide">
+              <span>客户邮箱 <strong>*</strong></span>
+              <textarea
+                name="email"
+                rows="1"
+                data-autogrow
+                required
+                placeholder="粘贴一条或多条客户邮箱"
+              ></textarea>
+            </label>
+            <label class="field wide">
+              <span>产品链接 <strong>*</strong></span>
+              <textarea
+                name="productLinks"
+                rows="1"
+                data-autogrow
+                required
+                placeholder="支持多条 App Store / Google Play 链接，每行一个"
+              ></textarea>
+            </label>
+            <label class="field">
+              <span>投放地区 <strong>*</strong></span>
+              <input name="geo" required placeholder="例如 US, JP, KR" />
+            </label>
+            <label class="field">
+              <span>预计上线日期 <strong>*</strong></span>
+              <input name="expectedLaunchDate" type="date" required />
+            </label>
+            <label class="field">
+              <span>预估日预算 <strong>*</strong></span>
+              <input name="dailySpend" type="number" min="0" step="1" value="300" required />
+            </label>
+            <label class="field">
+              <span>重点客户大媒体日预算</span>
+              <input name="budgetBucket" list="budgetBucketOptions" value="尾部(<1k)" />
+            </label>
+            <label class="field wide">
+              <span>合作情况</span>
+              <textarea
+                name="comments"
+                rows="1"
+                data-autogrow
+                placeholder="根据品类、投放地点自动生成"
+              ></textarea>
+            </label>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="section-title">
+            <h2>自动识别与补充信息</h2>
+            <p>这些字段会根据必填信息自动生成，也可以人工修正。</p>
+          </div>
+          <div class="grid">
+            <label class="field">
+              <span>主体名称</span>
+              <input name="entityName" placeholder="待人工确认" />
+            </label>
+            <label class="field">
+              <span>职位</span>
+              <input name="contactRole" value="UA" />
+            </label>
+            <label class="field">
+              <span>客户-姓</span>
+              <input name="clientLastName" placeholder="从第一个有效邮箱自动识别" />
+            </label>
+            <label class="field">
+              <span>客户-名</span>
+              <input name="clientFirstName" placeholder="从第一个有效邮箱自动识别" />
+            </label>
+            <label class="field">
+              <span>品类</span>
+              <input name="genre" list="genreOptions" placeholder="待人工确认" />
+            </label>
+            <label class="field">
+              <span>子品类</span>
+              <input name="subGenre" list="subGenreOptions" placeholder="待人工确认" />
+            </label>
+            <label class="field">
+              <span>状态</span>
+              <input name="stage" list="stageOptions" value="开户中" />
+            </label>
+            <label class="field">
+              <span>创建时间</span>
+              <input id="creationDateOutput" type="text" readonly />
+            </label>
+            <label class="field wide">
+              <span>Bundle ID</span>
+              <textarea id="bundleOutput" rows="1" data-autogrow readonly placeholder="从产品链接自动识别"></textarea>
+            </label>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="section-title">
+            <h2>Agency 信息</h2>
+          </div>
+          <div class="grid agency-grid">
+            <label class="field">
+              <span>Agency</span>
+              <input name="agency" value="Madhouse" />
+            </label>
+            <label class="field">
+              <span>是否新户</span>
+              <input name="newCustomerStatus" list="newCustomerOptions" value="New" />
+            </label>
+            <div id="agencyNoteOriginalSlot" class="agency-note-slot wide">
+              <label id="agencyNoteField" class="field wide">
+                <span>Note <strong id="noteRequiredMark" hidden>*</strong></span>
+                <textarea
+                  name="note"
+                  rows="1"
+                  data-autogrow
+                  placeholder="可填写补充说明"
+                ></textarea>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <details class="panel admin-panel">
+          <summary>管理员同步设置</summary>
+          <div class="admin-content">
+            <p>
+              Apps Script Web App URL 用于联网识别品类/主体名称，并提交到 Google Sheet。
+              建议管理员写入 app.js 的 DEFAULT_SCRIPT_URL，销售无需填写。
+            </p>
+            <label class="field wide">
+              <span>Apps Script Web App URL</span>
+              <input
+                name="scriptUrl"
+                type="url"
+                placeholder="https://script.google.com/macros/s/.../exec"
+                autocomplete="off"
+              />
+            </label>
+          </div>
+        </details>
+
+        <section class="actions">
+          <button class="secondary" type="reset" id="resetButton">重置</button>
+          <button type="submit">提交到 Google Sheet</button>
+        </section>
+
+        <section class="result" id="result" aria-live="polite" hidden></section>
+      </form>
+    </main>
+
+    <datalist id="agencySalesOptions">
+      <option value="曹璐"></option>
+      <option value="陈玉璞"></option>
+      <option value="邓颖芝"></option>
+      <option value="付婧"></option>
+      <option value="蒋菁菁"></option>
+      <option value="雷波"></option>
+      <option value="林敏"></option>
+      <option value="柳泽琛"></option>
+      <option value="鲁国兵"></option>
+      <option value="陆宏彬"></option>
+      <option value="宋进"></option>
+      <option value="孙林"></option>
+      <option value="王苏芬"></option>
+      <option value="谢家乐"></option>
+      <option value="熊乐"></option>
+      <option value="张鹏飞"></option>
+      <option value="张卓立"></option>
+      <option value="钟汉钊"></option>
+      <option value="钟维娜"></option>
+      <option value="周俐礽"></option>
+      <option value="朱朝晖"></option>
+      <option value="亿帆"></option>
+    </datalist>
+    <datalist id="molocoSalesOptions">
+      <option value="Jolie Zhang"></option>
+      <option value="Kimmy Lin"></option>
+      <option value="Ron Chen"></option>
+      <option value="Nina Cui"></option>
+      <option value="Sharon Kong"></option>
+      <option value="Growth"></option>
+    </datalist>
+    <datalist id="budgetBucketOptions">
+      <option value="尾部(<1k)"></option>
+      <option value="腰部(1-10k)"></option>
+      <option value="头部(>10k)"></option>
+    </datalist>
+    <datalist id="genreOptions">
+      <option value="Casual"></option>
+      <option value="Core"></option>
+      <option value="Slots/Social Casino"></option>
+      <option value="RealMoney"></option>
+      <option value="Scratcher"></option>
+      <option value="Non-gaming"></option>
+      <option value="Agency"></option>
+    </datalist>
+    <datalist id="subGenreOptions">
+      <option value="Casual-IAA"></option>
+      <option value="Casual-IAP"></option>
+      <option value="RPG"></option>
+      <option value="SLG"></option>
+      <option value="Action"></option>
+      <option value="Simulation"></option>
+      <option value="Slots/Social Casino"></option>
+      <option value="RealMoney"></option>
+      <option value="Scratcher"></option>
+      <option value="Social"></option>
+      <option value="e-Commerce"></option>
+      <option value="Fintech"></option>
+      <option value="Reading"></option>
+      <option value="AI tools"></option>
+      <option value="Utility"></option>
+      <option value="Agency"></option>
+      <option value="Entertainment"></option>
+      <option value="ShortTV"></option>
+      <option value="Sports"></option>
+    </datalist>
+    <datalist id="stageOptions">
+      <option value="开户中"></option>
+      <option value="Pitching"></option>
+      <option value="等待上线"></option>
+      <option value="已上线"></option>
+      <option value="暂不合作"></option>
+    </datalist>
+    <datalist id="newCustomerOptions">
+      <option value="New"></option>
+      <option value="Existing"></option>
+    </datalist>
+
+    <script src="./intake-core.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
