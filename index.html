@@ -50,13 +50,26 @@
               <span>代理商销售 <strong>*</strong></span>
               <input name="agencySales" list="agencySalesOptions" required placeholder="输入销售姓名" />
             </label>
-            <fieldset class="field radio-field">
-              <legend>是否为 Agency <strong>*</strong></legend>
-              <div class="radio-row">
-                <label><input type="radio" name="isAgency" value="否" checked /> <span>否</span></label>
-                <label><input type="radio" name="isAgency" value="是" /> <span>是</span></label>
-              </div>
-            </fieldset>
+            <div class="field field-pair">
+              <fieldset class="radio-field compact-radio-field">
+                <legend>是否为 Agency <strong>*</strong></legend>
+                <div class="radio-row compact-radio-row">
+                  <label><input type="radio" name="isAgency" value="否" checked /> <span>否</span></label>
+                  <label><input type="radio" name="isAgency" value="是" /> <span>是</span></label>
+                </div>
+              </fieldset>
+              <fieldset class="radio-field compact-radio-field">
+                <legend>是否老账户 <strong>*</strong></legend>
+                <div class="radio-row compact-radio-row">
+                  <label><input type="radio" name="isExistingAccount" value="否" checked /> <span>否</span></label>
+                  <label><input type="radio" name="isExistingAccount" value="是" /> <span>是</span></label>
+                </div>
+              </fieldset>
+            </div>
+            <label id="adAccountNameField" class="field" hidden>
+              <span>广告账户名 <strong>*</strong></span>
+              <input name="adAccountName" placeholder="填写已有广告账户名" />
+            </label>
             <label class="field">
               <span>客户名 <strong>*</strong></span>
               <input name="companyName" required />
@@ -106,7 +119,7 @@
             </label>
             <label class="field">
               <span>预估日预算 <strong>*</strong></span>
-              <input name="dailySpend" type="number" min="0" step="1" value="300" required />
+              <input name="dailySpend" type="number" min="300" step="1" value="300" required />
             </label>
             <label class="field">
               <span>重点客户大媒体日预算</span>

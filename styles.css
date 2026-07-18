@@ -21,6 +21,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -172,6 +176,11 @@ h2 {
   min-width: 0;
 }
 
+.field-pair {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
 .field.wide {
   grid-column: 1 / -1;
 }
@@ -204,20 +213,19 @@ h2 {
 }
 
 .radio-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  min-height: 42px;
 }
 
 .radio-row label {
   align-items: center;
-  border: 1px solid var(--line);
-  border-radius: 999px;
   cursor: pointer;
   display: flex;
   gap: 8px;
   min-height: 42px;
-  padding: 9px 12px;
+  padding: 2px 0;
 }
 
 .radio-row input {
@@ -226,9 +234,21 @@ h2 {
   width: auto;
 }
 
-.radio-row label:has(input:checked) {
-  border-color: var(--accent);
-  background: var(--soft);
+.compact-radio-field legend {
+  font-size: 12px;
+  line-height: 1.2;
+  margin-bottom: 6px;
+  white-space: nowrap;
+}
+
+.compact-radio-row {
+  gap: 4px;
+}
+
+.compact-radio-row label {
+  gap: 3px;
+  min-height: 42px;
+  padding: 2px 0;
 }
 
 input,

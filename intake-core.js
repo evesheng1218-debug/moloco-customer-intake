@@ -25,8 +25,10 @@
     email: ["客户邮箱", "联系人邮箱", "邮箱", "email", "e-mail"],
     molocoSales: ["Moloco Sales", "Moloco AM", "Moloco销售", "Moloco负责人", "Moloco对接人"],
     productLinks: ["产品链接", "应用链接", "商店链接", "App URL", "App Link", "productLinks", "url"],
-    isAgency: ["是否为Agency", "是否 Agency", "Agency", "isAgency", "是否代理"],
-    genre: ["品类", "一级品类", "genre", "category"],
+	    isAgency: ["是否为Agency", "是否 Agency", "Agency", "isAgency", "是否代理"],
+	    isExistingAccount: ["是否老账户", "老账户", "Existing Account", "isExistingAccount"],
+	    adAccountName: ["广告账户名", "广告账户名称", "Ad Account Name", "adAccountName"],
+	    genre: ["品类", "一级品类", "genre", "category"],
     subGenre: ["子品类", "二级品类", "subGenre", "subcategory"],
     geo: ["投放地区", "投放国家", "国家", "地区", "geo", "region", "country"],
     expectedLaunchDate: ["预计上线日期", "上线日期", "预计上线时间", "launch date"],
@@ -96,6 +98,14 @@
 	  function normalizeText(value) {
 	    return String(value ?? "").trim();
 	  }
+
+  function normalizeDailySpend(value) {
+    const normalized = normalizeText(value);
+    if (!normalized) return "";
+    const amount = Number(normalized);
+    if (Number.isNaN(amount)) return normalized;
+    return Math.max(300, amount);
+  }
 
 	  function isAllowedGenre(value) {
 	    return ALLOWED_GENRES.has(normalizeText(value));
@@ -486,8 +496,12 @@
       productLinks: normalizeProductLinks(
         firstMappedValue(row, SPREADSHEET_FIELD_ALIASES.productLinks)
       ).join("\n"),
-      isAgency: normalizeAgencyValue(firstMappedValue(row, SPREADSHEET_FIELD_ALIASES.isAgency)),
-      genre: firstMappedValue(row, SPREADSHEET_FIELD_ALIASES.genre),
+	      isAgency: normalizeAgencyValue(firstMappedValue(row, SPREADSHEET_FIELD_ALIASES.isAgency)),
+	      isExistingAccount: normalizeAgencyValue(
+	        firstMappedValue(row, SPREADSHEET_FIELD_ALIASES.isExistingAccount)
+	      ),
+	      adAccountName: firstMappedValue(row, SPREADSHEET_FIELD_ALIASES.adAccountName),
+	      genre: firstMappedValue(row, SPREADSHEET_FIELD_ALIASES.genre),
       subGenre: firstMappedValue(row, SPREADSHEET_FIELD_ALIASES.subGenre),
       geo: firstMappedValue(row, SPREADSHEET_FIELD_ALIASES.geo),
       expectedLaunchDate: firstMappedValue(row, SPREADSHEET_FIELD_ALIASES.expectedLaunchDate),
@@ -740,6 +754,9 @@
 	        errors.push("Agency 客户必须在 Note 粘贴飞书或 Google Drive 营业执照链接");
 	      }
 	    }
+	    if (normalizeText(input.isExistingAccount) === "是" && !normalizeText(input.adAccountName)) {
+	      errors.push("老账户必须填写广告账户名");
+	    }
 
 	    const outputGenre = normalizeText(input.isAgency) === "是" ? "Agency" : normalizeText(input.genre);
 	    const outputSubGenre = normalizeText(input.subGenre);
@@ -846,14 +863,13 @@
     const normalizedEmails = normalizeEmailInput(input.email);
     const primaryEmail = normalizedEmails[0] || normalizeText(input.email);
     const inferredName = inferNameFromEmail(primaryEmail);
-    const genre = isAgency ? "Agency" : normalizeText(input.genre);
-    const subGenre = normalizeText(input.subGenre);
+	    const genre = isAgency ? "Agency" : normalizeText(input.genre);
+	    const subGenre = normalizeText(input.subGenre);
+	    const isExistingAccount = normalizeText(input.isExistingAccount) === "是";
     const today =
       options.today ||
       new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Shanghai" });
-    const dailySpend = normalizeText(input.dailySpend)
-      ? Number(normalizeText(input.dailySpend))
-      : "";
+    const dailySpend = normalizeDailySpend(input.dailySpend);
 
     const rowObject = {
       agencySales: normalizeText(input.agencySales),
@@ -874,14 +890,16 @@
       budgetBucket: normalizeText(input.budgetBucket) || "尾部(<1k)",
       dailySpend,
       bundleId: extractBundleIds(input.productLinks).join("\n"),
-      adAccountName: "",
+	      adAccountName: normalizeText(input.adAccountName),
       agencyAm: "",
       agreeToPublishOnGetApps: "",
       week: "",
       pipelineSource: "",
       agency: normalizeText(input.agency) || "MADHOUSE",
       workplace: "",
-      newCustomerStatus: normalizeText(input.newCustomerStatus) || "New",
+	      newCustomerStatus: isExistingAccount
+	        ? "Existing"
+	        : normalizeText(input.newCustomerStatus) || "New",
       pipelineCreationDays: "",
       creationDateWriteInDate: "",
       note: normalizeText(input.note),
@@ -935,6 +953,7 @@
       mapOpeningSheetCellsToInput,
       mapSpreadsheetRowToInput,
       normalizeMolocoSales,
+      normalizeDailySpend,
       normalizeEmailInput,
       normalizeProductLinks,
       parseDelimitedTable,
