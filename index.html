@@ -27,8 +27,6 @@
             <small>先上传开户表，系统自动填入可识别字段</small>
           </button>
         </section>
-        <p class="recognition-status" id="recognitionStatus" hidden></p>
-
         <section class="panel excel-panel" id="excelPanel" hidden>
           <div class="section-title">
             <h2>Excel 开户表上传</h2>
@@ -73,8 +71,9 @@
             </label>
             <label class="field">
               <span>客户名 <strong>*</strong></span>
-              <input name="companyName" required />
+              <input name="companyName" required placeholder="输入客户简称" />
             </label>
+            <div id="agencyEntityTopSlot" class="entity-slot" hidden></div>
             <label class="field">
               <span>Moloco Sales <strong>*</strong></span>
               <input name="molocoSales" list="molocoSalesOptions" required placeholder="选择直客，Growth为增长团队" />
@@ -144,10 +143,12 @@
             <p>这些字段会根据必填信息自动生成，也可以人工修正。</p>
           </div>
           <div class="grid">
-            <label class="field">
-              <span>主体名称</span>
-              <input name="entityName" placeholder="待确认" />
-            </label>
+            <div id="entityOriginalSlot" class="entity-slot">
+              <label id="entityNameField" class="field">
+                <span>主体名称 <strong id="entityRequiredMark" hidden>*</strong></span>
+                <input name="entityName" placeholder="待确认" />
+              </label>
+            </div>
             <label class="field">
               <span>职位</span>
               <input name="contactRole" value="UA" />
@@ -231,7 +232,9 @@
 
         <section class="actions">
           <button class="secondary" type="reset" id="resetButton">重置</button>
-          <button type="submit">提交到 Google Sheet</button>
+          <span id="submitButtonWrap" class="submit-button-wrap">
+            <button id="submitButton" type="submit">提交到 Google Sheet</button>
+          </span>
         </section>
 
         <section class="result" id="result" aria-live="polite" hidden></section>

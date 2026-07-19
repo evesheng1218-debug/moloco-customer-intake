@@ -7,7 +7,7 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   const REQUIRED_FIELDS = [
     ["agencySales", "代理商销售为必填"],
-    ["companyName", "客户名为必填"],
+    ["companyName", "输入客户简称"],
     ["email", "邮箱为必填"],
     ["molocoSales", "Moloco Sales 为必填"],
     ["productLinks", "产品链接为必填"],
@@ -724,54 +724,68 @@
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   }
 
-  function validateInput(input) {
+  function validateInputDetails(input) {
     const errors = [];
+
+    const addError = (field, message) => {
+      errors.push({ field, message });
+    };
 
     for (const [key, message] of REQUIRED_FIELDS) {
       if (!normalizeText(input[key])) {
-        errors.push(message);
+        addError(key, message);
       }
     }
 
     if (normalizeText(input.email) && normalizeEmailInput(input.email).length === 0) {
-      errors.push("客户邮箱中未识别到有效邮箱");
+      addError("email", "客户邮箱中未识别到有效邮箱");
     }
 
     const dailySpend = normalizeText(input.dailySpend);
     if (dailySpend && Number.isNaN(Number(dailySpend))) {
-      errors.push("预估日预算必须是数字");
+      addError("dailySpend", "预估日预算必须是数字");
     }
 
 	    if (normalizeText(input.isAgency) === "是") {
+	      const entityName = normalizeText(input.entityName);
+	      if (!entityName) {
+	        addError("entityName", "输入营业执照公司名称");
+	      } else if (!keepEnglishEntityName(entityName)) {
+	        addError("entityName", "主体名称需要翻译为英文后再提交");
+	      }
 	      const note = normalizeText(input.note);
 	      if (!note) {
-	        errors.push("Agency 客户必须填写 Note，粘贴营业执照链接或文件名说明");
+	        addError("note", "Agency 客户必须填写 Note，粘贴营业执照链接或文件名说明");
       } else if (
         !/https:\/\/(?:bluefocus\.feishu\.cn\/(?:drive|file|docs|wiki)|drive\.google\.com\/(?:file\/d|open\b|drive\/folders))\//.test(
           note
         )
       ) {
-	        errors.push("Agency 客户必须在 Note 粘贴飞书或 Google Drive 营业执照链接");
+	        addError("note", "Agency 客户必须在 Note 粘贴飞书或 Google Drive 营业执照链接");
 	      }
 	    }
 	    if (normalizeText(input.isExistingAccount) === "是" && !normalizeText(input.adAccountName)) {
-	      errors.push("老账户必须填写广告账户名");
+	      addError("adAccountName", "老账户必须填写广告账户名");
 	    }
 
 	    const outputGenre = normalizeText(input.isAgency) === "是" ? "Agency" : normalizeText(input.genre);
 	    const outputSubGenre = normalizeText(input.subGenre);
 	    if (outputGenre && !isAllowedGenre(outputGenre)) {
-	      errors.push("品类必须是下拉菜单中的选项");
+	      addError("genre", "品类必须是下拉菜单中的选项");
 	    }
 	    if (outputSubGenre && !isAllowedSubGenre(outputSubGenre)) {
-	      errors.push("子品类必须是下拉菜单中的选项");
+	      addError("subGenre", "子品类必须是下拉菜单中的选项");
 	    }
 	    if (outputGenre && outputSubGenre && !isLogicalSubGenre(outputGenre, outputSubGenre)) {
-	      errors.push("品类与子品类不匹配，请从下拉菜单重新选择");
+	      addError("subGenre", "品类与子品类不匹配，请从下拉菜单重新选择");
 	    }
 
 	    return errors;
 	  }
+
+  function validateInput(input) {
+    return validateInputDetails(input).map((item) => item.message);
+  }
 
   function titleCasePart(value) {
     if (!value) return "";
@@ -858,7 +872,8 @@
   }
 
   function buildSubmission(input, options = {}) {
-    const errors = validateInput(input);
+    const errorDetails = validateInputDetails(input);
+    const errors = errorDetails.map((item) => item.message);
     const isAgency = normalizeText(input.isAgency) === "是";
     const normalizedEmails = normalizeEmailInput(input.email);
     const primaryEmail = normalizedEmails[0] || normalizeText(input.email);
@@ -937,7 +952,7 @@
       rowObject.note,
     ];
 
-    return { values, rowObject, errors };
+    return { values, rowObject, errors, errorDetails };
   }
 
   return {
@@ -961,5 +976,6 @@
       parseXlsxXmlTable,
       selectXlsxWorksheetName,
       validateInput,
+      validateInputDetails,
   };
 });

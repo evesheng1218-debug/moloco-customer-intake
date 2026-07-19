@@ -6,6 +6,10 @@
   const agencyNoteField = document.querySelector("#agencyNoteField");
   const agencyLicenseNotice = document.querySelector("#agencyLicenseNotice");
   const noteRequiredMark = document.querySelector("#noteRequiredMark");
+  const agencyEntityTopSlot = document.querySelector("#agencyEntityTopSlot");
+  const entityOriginalSlot = document.querySelector("#entityOriginalSlot");
+  const entityNameField = document.querySelector("#entityNameField");
+  const entityRequiredMark = document.querySelector("#entityRequiredMark");
   const modePill = document.querySelector("#modePill");
   const bundleOutput = document.querySelector("#bundleOutput");
   const creationDateOutput = document.querySelector("#creationDateOutput");
@@ -13,27 +17,22 @@
   const excelPanel = document.querySelector("#excelPanel");
   const adminPanel = document.querySelector(".admin-panel");
   const modeCards = Array.from(document.querySelectorAll("[data-entry-mode]"));
-  const recognitionHint = document.querySelector("#recognitionHint");
-  const recognitionStatus = document.querySelector("#recognitionStatus");
+  const submitButton = document.querySelector("#submitButton");
+  const submitButtonWrap = document.querySelector("#submitButtonWrap");
   const core = window.MolocoIntakeCore;
   const DEFAULT_SCRIPT_URL =
     "https://script.google.com/macros/s/AKfycbxkk2de7YLmx9tl9S_GDAYFVoBl4RsIyHGIFhXd9TcUrDtKkWX__f57xcZVaitCLbHd/exec";
   const SCRIPT_URL_STORAGE_KEY = "molocoCustomerIntakeScriptUrl";
   let productFormatTimer;
   let productPageRecognitionTimer;
+  let entityTranslationTimer;
+  let productTimerPending = false;
+  let entityTimerPending = false;
+  let entityTranslationToken = 0;
+  let pendingRecognitionCount = 0;
+  let recognitionHadFailure = false;
   let lastProductPageRecognitionKey = "";
   let lastProductPageRecognition;
-
-  function setRecognitionHint(message, type = "info") {
-    if (recognitionHint) {
-      recognitionHint.value = message;
-    }
-    if (recognitionStatus) {
-      recognitionStatus.hidden = !message;
-      recognitionStatus.textContent = message;
-      recognitionStatus.dataset.type = type;
-    }
-  }
 
   function resizeTextarea(element) {
     if (!element || !element.matches("textarea[data-autogrow]")) return;
@@ -128,6 +127,69 @@
     result.textContent = "";
   }
 
+  function focusValidationField(fieldName) {
+    const radio = form.querySelector(`input[type="radio"][name="${fieldName}"]`);
+    const control = radio || form.elements[fieldName];
+    if (!control || typeof control.focus !== "function") return;
+
+    const target = control.closest(".field, fieldset, .field-pair") || control;
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    window.setTimeout(() => control.focus({ preventScroll: true }), 250);
+    target.classList.remove("validation-target");
+    void target.offsetWidth;
+    target.classList.add("validation-target");
+    window.setTimeout(() => target.classList.remove("validation-target"), 1700);
+  }
+
+  function showValidationErrors(details) {
+    result.hidden = false;
+    result.className = "result error";
+    result.textContent = "";
+
+    const list = document.createElement("div");
+    list.className = "validation-list";
+    const heading = document.createElement("p");
+    heading.textContent = "请补充以下内容：";
+    list.appendChild(heading);
+
+    details.forEach(({ field, message }) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "validation-link";
+      button.textContent = message;
+      button.addEventListener("click", () => focusValidationField(field));
+      list.appendChild(button);
+    });
+
+    result.appendChild(list);
+    result.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  function syncSubmitRecognitionState() {
+    const isWaiting = pendingRecognitionCount > 0;
+    submitButton.disabled = isWaiting;
+    submitButtonWrap.dataset.waiting = String(isWaiting);
+    submitButtonWrap.title = isWaiting ? "等待识别完毕" : "";
+    if (isWaiting) {
+      modePill.textContent = "正在识别";
+    }
+  }
+
+  function beginRecognition() {
+    if (pendingRecognitionCount === 0) recognitionHadFailure = false;
+    pendingRecognitionCount += 1;
+    syncSubmitRecognitionState();
+  }
+
+  function endRecognition(succeeded) {
+    if (!succeeded) recognitionHadFailure = true;
+    pendingRecognitionCount = Math.max(0, pendingRecognitionCount - 1);
+    syncSubmitRecognitionState();
+    if (pendingRecognitionCount === 0) {
+      modePill.textContent = recognitionHadFailure ? "识别失败" : "识别完成";
+    }
+  }
+
   function setEntryMode(mode) {
     modeCards.forEach((card) => {
       const isActive = card.dataset.entryMode === mode;
@@ -162,6 +224,18 @@
     }
     if (agencyLicenseNotice.parentElement !== targetSlot) {
       targetSlot.appendChild(agencyLicenseNotice);
+    }
+
+    const entityTargetSlot = isAgency ? agencyEntityTopSlot : entityOriginalSlot;
+    agencyEntityTopSlot.hidden = !isAgency;
+    entityOriginalSlot.hidden = isAgency;
+    entityRequiredMark.hidden = !isAgency;
+    form.elements.entityName.required = isAgency;
+    form.elements.entityName.placeholder = isAgency
+      ? "输入营业执照公司名称"
+      : "待确认";
+    if (entityNameField.parentElement !== entityTargetSlot) {
+      entityTargetSlot.appendChild(entityNameField);
     }
 
     if (isAgency) {
@@ -410,6 +484,10 @@
   }
 
   function updateModePill() {
+    if (pendingRecognitionCount > 0) {
+      modePill.textContent = "正在识别";
+      return;
+    }
     const scriptUrl = getScriptUrl();
     modePill.textContent = scriptUrl ? "同步已配置" : "待配置同步";
   }
@@ -468,7 +546,7 @@
     if (canReplaceAutoValue(form.elements.clientFirstName)) {
       setAutoValue(form.elements.clientFirstName, names.firstName);
     }
-    if (canReplaceAutoValue(form.elements.entityName)) {
+    if (!isAgency && canReplaceAutoValue(form.elements.entityName)) {
       setAutoValue(
         form.elements.entityName,
         core.keepEnglishEntityName(lastProductPageRecognition?.entityName || input.companyName)
@@ -522,24 +600,6 @@
     }
     bundleOutput.value = bundleIds.join("\n");
     resizeTextareas();
-    if (lastProductPageRecognition) {
-      setRecognitionHint([
-        `邮箱：识别到 ${emails.length} 个有效邮箱，提交时使用第一个。`,
-        `品类：${lastProductPageRecognition.confidence}`,
-        lastProductPageRecognition.entityName
-          ? `主体名称：从产品页面识别到 ${lastProductPageRecognition.entityName}`
-          : "主体名称：产品页面未识别到开发者/主体名称",
-        `识别链接：${lastProductPageRecognition.sourceUrl || "产品链接"}`,
-      ].join("\n"));
-    } else {
-      setRecognitionHint([
-        `邮箱：识别到 ${emails.length} 个有效邮箱，提交时使用第一个。`,
-        `品类：${category.confidence}。配置 Apps Script 后会自动进入产品页面识别。`,
-        isAgency
-          ? "主体名称：Agency 需根据上传的营业执照识别英文主体名称。"
-          : "主体名称：配置 Apps Script 后会自动尝试从产品页面识别英文主体名称。",
-      ].join("\n"));
-    }
   }
 
   async function submitToScript(scriptUrl, submission) {
@@ -556,13 +616,13 @@
     return payload;
   }
 
-  async function classifyProductViaScript(scriptUrl, productLinks) {
+  async function classifyProductViaScript(scriptUrl, productLinks, companyName) {
     try {
       const response = await fetch(scriptUrl, {
         method: "POST",
         mode: "cors",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ action: "classifyProduct", productLinks }),
+        body: JSON.stringify({ action: "classifyProduct", productLinks, companyName }),
       });
       const payload = await response.json();
       if (!payload.ok) {
@@ -570,11 +630,11 @@
       }
       return payload;
     } catch (error) {
-      return classifyProductViaJsonp(scriptUrl, productLinks, error);
+      return classifyProductViaJsonp(scriptUrl, productLinks, companyName, error);
     }
   }
 
-  function classifyProductViaJsonp(scriptUrl, productLinks, originalError) {
+  function classifyProductViaJsonp(scriptUrl, productLinks, companyName, originalError) {
     return new Promise((resolve, reject) => {
       const callbackName = `molocoClassify_${Date.now()}_${Math.random()
         .toString(36)
@@ -602,11 +662,69 @@
 
       url.searchParams.set("action", "classifyProduct");
       url.searchParams.set("productLinks", productLinks);
+      url.searchParams.set("companyName", companyName || "");
       url.searchParams.set("callback", callbackName);
       script.onerror = () => {
         window.clearTimeout(timer);
         cleanup();
         reject(originalError || new Error("产品页面识别失败"));
+      };
+      script.src = url.toString();
+      document.head.appendChild(script);
+    });
+  }
+
+  async function translateEntityViaScript(scriptUrl, entityName) {
+    try {
+      const response = await fetch(scriptUrl, {
+        method: "POST",
+        mode: "cors",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ action: "translateEntityName", entityName }),
+      });
+      const payload = await response.json();
+      if (!payload.ok || !payload.entityName) {
+        throw new Error(payload.message || "主体名称翻译失败");
+      }
+      return payload;
+    } catch (error) {
+      return translateEntityViaJsonp(scriptUrl, entityName, error);
+    }
+  }
+
+  function translateEntityViaJsonp(scriptUrl, entityName, originalError) {
+    return new Promise((resolve, reject) => {
+      const callbackName = `molocoTranslate_${Date.now()}_${Math.random()
+        .toString(36)
+        .slice(2)}`;
+      const url = new URL(scriptUrl);
+      const script = document.createElement("script");
+      const cleanup = () => {
+        delete window[callbackName];
+        script.remove();
+      };
+      const timer = window.setTimeout(() => {
+        cleanup();
+        reject(originalError || new Error("主体名称翻译超时"));
+      }, 20000);
+
+      window[callbackName] = (payload) => {
+        window.clearTimeout(timer);
+        cleanup();
+        if (!payload?.ok || !payload.entityName) {
+          reject(new Error(payload?.message || "主体名称翻译失败"));
+          return;
+        }
+        resolve(payload);
+      };
+
+      url.searchParams.set("action", "translateEntityName");
+      url.searchParams.set("entityName", entityName);
+      url.searchParams.set("callback", callbackName);
+      script.onerror = () => {
+        window.clearTimeout(timer);
+        cleanup();
+        reject(originalError || new Error("主体名称翻译失败"));
       };
       script.src = url.toString();
       document.head.appendChild(script);
@@ -632,48 +750,92 @@
       setAutoValue(form.elements.note, category.commercializationNote);
       delete form.elements.note.dataset.edited;
     }
-    if (entityName && canReplaceAutoValue(form.elements.entityName)) {
+    if (!isAgency && entityName && canReplaceAutoValue(form.elements.entityName)) {
       setAutoValue(form.elements.entityName, entityName);
       delete form.elements.entityName.dataset.edited;
     }
-    setRecognitionHint([
-      `品类：${category.confidence}`,
-      entityName
-        ? `主体名称：从产品页面识别到 ${entityName}`
-        : "主体名称：产品页面未识别到英文开发者/主体名称，已优先使用英文客户名兜底",
-      `识别链接：${category.sourceUrl || "产品链接"}`,
-    ].join("\n"), "success");
     lastProductPageRecognition = { ...category, entityName };
   }
 
   function scheduleProductPageRecognition() {
     window.clearTimeout(productPageRecognitionTimer);
-    productPageRecognitionTimer = window.setTimeout(async () => {
-      const input = getFormInput();
-      const scriptUrl = getScriptUrl();
-      const links = core.normalizeProductLinks(input.productLinks);
-      if (!scriptUrl || !links.length) return;
+    if (productTimerPending) {
+      productTimerPending = false;
+      endRecognition(true);
+    }
 
-      const key = `${scriptUrl}::${links[0]}`;
-      if (key === lastProductPageRecognitionKey) return;
+    const input = getFormInput();
+    const scriptUrl = getScriptUrl();
+    const links = core.normalizeProductLinks(input.productLinks);
+    if (!scriptUrl || !links.length) return;
+
+    const key = `${scriptUrl}::${links[0]}`;
+    if (key === lastProductPageRecognitionKey) return;
+
+    productTimerPending = true;
+    beginRecognition();
+    productPageRecognitionTimer = window.setTimeout(async () => {
+      productTimerPending = false;
       lastProductPageRecognition = null;
+      let succeeded = false;
 
       try {
-        setRecognitionHint("正在通过产品页面识别品类和主体名称...", "info");
-        modePill.textContent = "正在联网识别";
-        const category = await classifyProductViaScript(scriptUrl, links.join("\n"));
+        const category = await classifyProductViaScript(
+          scriptUrl,
+          links.join("\n"),
+          input.companyName
+        );
         lastProductPageRecognitionKey = key;
         applyProductPageRecognition(category);
         updateRecognition();
-      } catch (error) {
+        succeeded = true;
+      } catch (_error) {
         lastProductPageRecognitionKey = "";
-        modePill.textContent = "联网识别失败";
-        setRecognitionHint([
-          "产品页面联网识别失败，已保留本地规则识别结果。",
-          `失败原因：${error.message || "请确认 Apps Script Web App URL 已重新部署新版本。"}`,
-        ].join("\n"), "error");
+      } finally {
+        endRecognition(succeeded);
       }
     }, 900);
+  }
+
+  function scheduleAgencyEntityTranslation() {
+    window.clearTimeout(entityTranslationTimer);
+    if (entityTimerPending) {
+      entityTimerPending = false;
+      endRecognition(true);
+    }
+    const isAgency = form.elements.isAgency.value === "是";
+    const sourceName = form.elements.entityName.value.trim();
+    if (!isAgency || !sourceName || !/[^\x00-\x7F]/.test(sourceName)) return;
+
+    const requestToken = ++entityTranslationToken;
+    entityTimerPending = true;
+    beginRecognition();
+    entityTranslationTimer = window.setTimeout(async () => {
+      entityTimerPending = false;
+      const scriptUrl = getScriptUrl();
+      if (!scriptUrl) {
+        endRecognition(false);
+        return;
+      }
+
+      let succeeded = false;
+      try {
+        const payload = await translateEntityViaScript(scriptUrl, sourceName);
+        if (
+          requestToken === entityTranslationToken &&
+          form.elements.isAgency.value === "是" &&
+          form.elements.entityName.value.trim() === sourceName
+        ) {
+          setAutoValue(form.elements.entityName, payload.entityName);
+          delete form.elements.entityName.dataset.edited;
+        }
+        succeeded = true;
+      } catch (_error) {
+        // The required English-name validation provides the actionable fallback.
+      } finally {
+        endRecognition(succeeded);
+      }
+    }, 700);
   }
 
   function resetDefaults() {
@@ -712,9 +874,16 @@
   form.elements.clientFirstName.addEventListener("input", () =>
     markEditedWhenDifferent(form.elements.clientFirstName)
   );
-  form.elements.entityName.addEventListener("input", () =>
-    markEditedWhenDifferent(form.elements.entityName)
-  );
+  form.elements.entityName.addEventListener("input", () => {
+    markEditedWhenDifferent(form.elements.entityName);
+    scheduleAgencyEntityTranslation();
+  });
+  Array.from(form.elements.isAgency).forEach((radio) => {
+    radio.addEventListener("change", () => {
+      updateAgencyState();
+      scheduleAgencyEntityTranslation();
+    });
+  });
   form.elements.genre.addEventListener("input", () => markEditedWhenDifferent(form.elements.genre));
   form.elements.subGenre.addEventListener("input", () =>
     markEditedWhenDifferent(form.elements.subGenre)
@@ -818,6 +987,7 @@
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (pendingRecognitionCount > 0) return;
     enforceDailySpendMinimum();
     updateRecognition();
 
@@ -826,7 +996,9 @@
     const submission = core.buildSubmission(input);
 
     if (submission.errors.length) {
-      setResult("error", submission.errors.join("\n"));
+      showValidationErrors(
+        submission.errorDetails || submission.errors.map((message) => ({ field: "", message }))
+      );
       return;
     }
 
